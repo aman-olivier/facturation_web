@@ -141,7 +141,7 @@ export async function deleteQuoteContact(id: string) {
   revalidatePath('/quotes')
 }
 
-export async function updateQuoteInfo(id: string, updates: { client_name?: string, notes?: string }) {
+export async function updateQuoteInfo(id: string, updates: { client_name?: string, notes?: string, shipping_cost?: number, discount?: number, tax_rate?: number }) {
   const supabase = await createClient()
   await supabase.from('quotes').update({
     ...updates,
