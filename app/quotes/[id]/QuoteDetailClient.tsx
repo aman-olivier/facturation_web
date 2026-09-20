@@ -34,6 +34,7 @@ function formatCurrency(amount: number) {
 }
 
 import { updateQuoteStatus, deleteQuote, addQuoteContact, updateQuoteContact, deleteQuoteContact, updateQuoteInfo } from '../actions'
+import { createInvoice } from '@/app/invoices/actions'
 import { useRouter } from "next/navigation"
 
 function getStatusLabel(status: string) {
@@ -49,6 +50,7 @@ function getStatusLabel(status: string) {
 export default function QuoteDetailClient({ quote }: { quote: any }) {
   const router = useRouter()
   const [isEmailModalOpen, setIsEmailModalOpen] = React.useState(false)
+  const [isSending, setIsSending] = React.useState(false)
   const [isContactModalOpen, setIsContactModalOpen] = React.useState(false)
   const [isNotesModalOpen, setIsNotesModalOpen] = React.useState(false)
   const [isEditClientModalOpen, setIsEditClientModalOpen] = React.useState(false)
@@ -56,6 +58,17 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
   const [openContactMenuId, setOpenContactMenuId] = React.useState<string | null>(null)
   const [notes, setNotes] = React.useState(quote.notes || "")
   const [clientNameInput, setClientNameInput] = React.useState(quote.client_name || "")
+  const [clientCompanyInput, setClientCompanyInput] = React.useState(quote.client_company || "")
+  const [clientAddressInput, setClientAddressInput] = React.useState(quote.client_address || "")
+  const [clientShippingAddressInput, setClientShippingAddressInput] = React.useState(quote.client_shipping_address || "")
+  const [showFooterStats, setShowFooterStats] = React.useState(false)
+
+  React.useEffect(() => {
+    setClientNameInput(quote.client_name || "")
+    setClientCompanyInput(quote.client_company || "")
+    setClientAddressInput(quote.client_address || "")
+    setClientShippingAddressInput(quote.client_shipping_address || "")
+  }, [quote.client_name, quote.client_company, quote.client_address, quote.client_shipping_address])
 
   // Suggestion d'articles (combobox)
   const [articleSearch, setArticleSearch] = React.useState("")
@@ -131,6 +144,40 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
   const profitMarkup = subTotal - costTotal
   const marginPercent = subTotal > 0 ? (profitMarkup / subTotal) * 100 : 0
 
+  const handleSendEmail = async () => {
+    setIsSending(true);
+    try {
+      await updateQuoteStatus(quote.id, "accepted");
+      
+      const newInvoiceId = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const invoiceData = {
+        id: newInvoiceId,
+        client: quote.client_name,
+        status: "draft",
+        date: new Date().toLocaleDateString('fr-FR'),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR'),
+        amount: grandTotal,
+        taxRate: taxRate
+      };
+
+      const invoiceLines = lines.map((l: any) => ({
+        description: l.name,
+        quantity: l.qty,
+        unitPrice: l.unitPrice
+      }));
+
+      await createInvoice(invoiceData, invoiceLines);
+      
+      setIsEmailModalOpen(false);
+      router.push('/invoices');
+    } catch (err) {
+      console.error(err);
+      alert("Une erreur est survenue lors de l'envoi.");
+    } finally {
+      setIsSending(false);
+    }
+  }
+
   const handlePrint = () => {
     window.print()
   }
@@ -174,7 +221,12 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
   }
 
   const handleSaveClientName = async () => {
-    await updateQuoteInfo(quote.id, { client_name: clientNameInput })
+    await updateQuoteInfo(quote.id, { 
+      client_name: clientNameInput,
+      client_company: clientCompanyInput,
+      client_address: clientAddressInput,
+      client_shipping_address: clientShippingAddressInput
+    })
     setIsEditClientModalOpen(false)
   }
 
@@ -214,30 +266,30 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
   }
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-64px)] h-full bg-white relative">
+    <div className="flex flex-col min-h-[calc(100vh-64px)] h-full bg-white relative overflow-hidden">
       
       {/* Header section (Non-sticky to flow with page) */}
-      <div className="border-b border-gray-200 px-6 py-4 bg-white shrink-0">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-3 print:hidden">
+      <div className="border-b border-gray-200 px-4 py-2 bg-white shrink-0">
+        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1 print:hidden">
           <Link href="/quotes" className="hover:text-gray-900 transition-colors">Devis</Link>
           <span>›</span>
           <span className="text-gray-900 font-medium">Devis pour {quote.client_name}</span>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex gap-4">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-bold shrink-0">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div className="flex gap-3">
+            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-bold shrink-0">
               MH
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
                 Devis pour {quote.client_name}
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-0.5">
                 Dernière émission : {quote.issue_date} par {quote.company?.name}
               </p>
               
-              <div className="flex flex-wrap items-center gap-3 mt-3">
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 <div className="flex items-center gap-1 text-xs">
                   <span className="text-gray-500 uppercase font-semibold">Status</span>
                   <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200 ml-1">{getStatusLabel(quote.status)}</Badge>
@@ -259,15 +311,15 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
                 </button>
               </div>
 
-              <div className="flex gap-12 mt-4 text-xs">
+              <div className="flex gap-8 mt-2 text-xs">
                 <div>
-                  <span className="text-gray-500 uppercase font-semibold block mb-1">Client</span>
+                  <span className="text-gray-500 uppercase font-semibold block mb-0.5">Client</span>
                   <a href="#" className="text-blue-600 font-medium flex items-center gap-1 hover:underline">
                     {quote.client_name} <LinkIcon size={10} className="print:hidden" />
                   </a>
                 </div>
                 <div>
-                  <span className="text-gray-500 uppercase font-semibold block mb-1">Fournisseur</span>
+                  <span className="text-gray-500 uppercase font-semibold block mb-0.5">Fournisseur</span>
                   <a href="#" className="text-blue-600 font-medium flex items-center gap-1 hover:underline">
                     {quote.company?.name || "Ahimou Corp"} <LinkIcon size={10} className="print:hidden" />
                   </a>
@@ -278,18 +330,18 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
           </div>
 
           <div className="flex items-center gap-2 print:hidden">
-            <Button variant="outline" className="gap-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-transparent" onClick={handleDelete}>
+            <Button variant="outline" size="sm" className="gap-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-transparent" onClick={handleDelete}>
               Supprimer
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-9 px-6 rounded-md" onClick={handlePrint}>
-              <Send size={16} />
-              Télécharger PDF
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white gap-1 h-8 px-4 rounded-md" onClick={handlePrint}>
+              <Send size={14} />
+              PDF
             </Button>
           </div>
         </div>
 
         {/* Horizontal Navigation Tabs */}
-        <div className="flex gap-6 mt-6 border-b border-gray-100 print:hidden">
+        <div className="flex gap-6 mt-3 border-b border-gray-100 print:hidden">
           <button className="text-blue-600 border-b-2 border-blue-600 pb-2 font-medium text-sm px-1 flex items-center gap-2">
             <Edit size={14} /> Gérer
           </button>
@@ -310,15 +362,15 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
 
       {/* Main Grid Area */}
       <div className="flex-1 overflow-y-auto bg-gray-50/30">
-        <div className="max-w-[1400px] mx-auto p-4 md:p-6 pb-32 grid lg:grid-cols-[320px_1fr] gap-6">
+        <div className="max-w-[1400px] mx-auto p-4 md:p-4 pb-32 grid lg:grid-cols-[260px_1fr] gap-4">
           
           {/* LEFT SIDEBAR */}
-          <div className="space-y-4 print:hidden">
+          <div className="space-y-3 print:hidden">
             
             {/* Company/Fournisseur Card */}
             <Card className="border-gray-200 shadow-sm rounded-xl">
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-4">
+              <CardContent className="p-3">
+                <div className="flex justify-between items-start mb-2">
                   <div className="flex gap-3">
                     <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 text-xs font-bold">FR</div>
                     <div>
@@ -394,40 +446,37 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
 
             {/* Customer Card */}
             <Card className="border-gray-200 shadow-sm rounded-xl">
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-4">
+              <CardContent className="p-3">
+                <div className="flex justify-between items-start mb-2">
                   <div className="flex gap-3">
                     <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 text-xs font-bold">MH</div>
                     <div>
                       <p className="text-xs text-gray-500 uppercase font-semibold">Client</p>
-                      <p className="font-semibold text-gray-900 text-sm">Martin Army Communit...</p>
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><Building2 size={10} /> Dept of Veterans Affairs</p>
+                      <p className="font-semibold text-gray-900 text-sm">{quote.client_name || "Nom inconnu"}</p>
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><Building2 size={10} /> {quote.client_company || "Entreprise Inconnue"}</p>
                     </div>
                   </div>
-                  <Edit size={14} className="text-gray-400" />
+                  <Edit size={14} className="text-gray-400 cursor-pointer hover:text-gray-900" onClick={() => setIsEditClientModalOpen(true)} />
                 </div>
                 
-                {/* Simulated Map Area */}
-                <div className="h-24 bg-blue-50/50 rounded-lg mb-3 border border-blue-100 flex items-center justify-center relative overflow-hidden">
-                   <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
-                   <MapPin className="text-blue-500 z-10" />
+                {/* Map Area */}
+                <div className="h-24 bg-gray-100 rounded-lg mb-3 border border-gray-200 flex items-center justify-center relative overflow-hidden">
+                   <img src="/map_snippet.jpg" alt="Localisation client" className="w-full h-full object-cover" />
                 </div>
                 
                 <p className="text-sm text-gray-700 font-medium leading-relaxed pr-6 relative mb-2">
-                  1255 Wilford Hall Loop BLDG 4430,
-                  Lackland Air Force Base, TX 78236, USA
+                  {quote.client_address || "Aucune adresse renseignée"}
                   <Copy size={14} className="absolute right-0 top-1 text-gray-400 cursor-pointer" />
                 </p>
                 
                 <a href="#" className="text-blue-600 text-xs font-semibold hover:underline">Voir sur la carte →</a>
 
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100 flex gap-3 items-start">
-                  <MapPin size={16} className="text-gray-700 shrink-0 mt-0.5" />
+                <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-100 flex gap-2 items-start">
+                  <MapPin size={14} className="text-gray-700 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold">Destination de livraison</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">98493, 9600 Veterans Dr</p>
-                    <p className="text-xs text-gray-600">Tacoma, WA, USA</p>
-                    <Button variant="outline" size="sm" className="mt-2 h-7 text-xs text-blue-600 border-blue-200 bg-white">Changer l'adresse</Button>
+                    <p className="text-[10px] text-gray-500 uppercase font-semibold">Destination de livraison</p>
+                    <p className="text-xs font-semibold text-gray-900 mt-0.5">{quote.client_shipping_address || "Non définie"}</p>
+                    <Button variant="outline" size="sm" className="mt-1.5 h-6 text-[10px] px-2 text-blue-600 border-blue-200 bg-white" onClick={() => setIsEditClientModalOpen(true)}>Changer l'adresse</Button>
                   </div>
                 </div>
               </CardContent>
@@ -439,11 +488,11 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
             
             {/* Phase Block */}
             <Card className="border-gray-200 shadow-sm rounded-xl overflow-hidden">
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex justify-between items-start mb-6">
+              <div className="p-4 border-b border-gray-100">
+                <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Phase 1</h2>
-                    <p className="text-sm text-gray-500">Nous allons offrir ces services dans la phase 1</p>
+                    <h2 className="text-lg font-bold text-gray-900">Phase 1</h2>
+                    <p className="text-xs text-gray-500">Nous allons offrir ces services dans la phase 1</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <Button variant="outline" size="sm" className="h-8 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => setIsEditClientModalOpen(true)}>
@@ -460,7 +509,7 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
                 </div>
 
                 {/* Phase Tabs */}
-                <div className="flex gap-6 border-b border-gray-100 mb-4 print:hidden">
+                <div className="flex gap-6 border-b border-gray-100 mb-3 print:hidden">
                   <button className="text-blue-600 border-b-2 border-blue-600 pb-2 font-medium text-sm px-1 flex items-center gap-2">
                     Articles <Badge className="bg-blue-100 text-blue-700 ml-1 rounded-full px-1.5 min-w-[20px] justify-center">{lines.length}</Badge>
                   </button>
@@ -702,46 +751,73 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
         </div>
       </div>
 
-      {/* STICKY BOTTOM BAR */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 print:hidden">
-        <div className="max-w-[1400px] mx-auto flex items-stretch">
+      {/* STICKY BOTTOM BAR (Collapsible on hover) */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 z-20 print:hidden flex justify-center pointer-events-none"
+        onMouseLeave={() => setShowFooterStats(false)}
+      >
+        <div className="pointer-events-none w-full relative flex flex-col justify-end items-center">
           
-          <div className="flex-1 flex items-center justify-around py-3 px-6 divide-x divide-gray-100">
-            <div className="px-4 text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Sous-total</p>
-              <p className="font-bold text-gray-900">{formatCurrency(subTotal)}</p>
-            </div>
-            <div className="px-4 text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Coûts</p>
-              <p className="font-bold text-gray-900">{formatCurrency(costTotal)}</p>
-            </div>
-            <div className="px-4 text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Port</p>
-              <p className="font-bold text-gray-900">{formatCurrency(shippingCost)}</p>
-            </div>
-            <div className="px-4 text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Remise</p>
-              <p className="font-bold text-gray-900">{formatCurrency(discount)}</p>
-            </div>
-            <div className="px-4 text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Taxes</p>
-              <p className="font-bold text-gray-900">{formatCurrency(taxes)}</p>
-            </div>
-            <div className="px-4 text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Marge brute</p>
-              <p className="font-bold text-gray-900">{formatCurrency(profitMarkup)}</p>
-            </div>
-            <div className="px-4 text-center">
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Marge %</p>
-              <p className="font-bold text-gray-900">{marginPercent.toFixed(1)}%</p>
+          {/* Mini Tab - The only trigger area to open */}
+          <div 
+            className={`absolute bottom-0 flex justify-center transition-transform duration-300 ease-out z-10 pointer-events-auto ${showFooterStats ? 'translate-y-full' : 'translate-y-0'}`}
+            onMouseEnter={() => setShowFooterStats(true)}
+            onClick={() => setShowFooterStats(true)}
+          >
+            <div className="bg-blue-600 text-white px-6 py-1.5 rounded-t-xl cursor-pointer shadow-[0_-4px_10px_rgba(0,0,0,0.1)] flex items-center gap-4">
+              <span className="text-[10px] font-semibold uppercase flex items-center gap-1.5 opacity-90">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                Total provisoire
+              </span>
+              <span className="font-bold text-sm">{formatCurrency(grandTotal)}</span>
             </div>
           </div>
 
-          <div className="bg-blue-600 text-white flex flex-col justify-center items-center px-12 cursor-pointer hover:bg-blue-700 transition-colors">
-            <p className="text-xs font-medium uppercase opacity-90 mb-1">Total Général</p>
-            <p className="text-xl font-bold">{formatCurrency(grandTotal)}</p>
-          </div>
+          {/* Full Bar */}
+          <div className={`w-full bg-white border-t border-gray-200 shadow-[0_-10px_30px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-out flex relative z-20 pointer-events-auto ${showFooterStats ? 'translate-y-0' : 'translate-y-full'}`}>
+            <div className="max-w-[1400px] mx-auto flex items-stretch w-full">
+              <div className="flex-1 flex items-center justify-around py-3 px-4 divide-x divide-gray-100">
+                <div className="px-2 text-center">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Sous-total</p>
+                  <p className="font-bold text-xs text-gray-900">{formatCurrency(subTotal)}</p>
+                </div>
+                <div className="px-2 text-center">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Coûts</p>
+                  <p className="font-bold text-xs text-gray-900">{formatCurrency(costTotal)}</p>
+                </div>
+                <div className="px-2 text-center">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Port</p>
+                  <p className="font-bold text-xs text-gray-900">{formatCurrency(shippingCost)}</p>
+                </div>
+                <div className="px-2 text-center">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Remise</p>
+                  <p className="font-bold text-xs text-gray-900">{formatCurrency(discount)}</p>
+                </div>
+                <div className="px-2 text-center">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Taxes</p>
+                  <p className="font-bold text-xs text-gray-900">{formatCurrency(taxes)}</p>
+                </div>
+                <div className="px-2 text-center">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Marge brute</p>
+                  <p className="font-bold text-xs text-gray-900">{formatCurrency(profitMarkup)}</p>
+                </div>
+                <div className="px-2 text-center">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Marge %</p>
+                  <p className="font-bold text-xs text-gray-900">{marginPercent.toFixed(1)}%</p>
+                </div>
+              </div>
 
+              <div 
+                className="bg-blue-600 text-white flex flex-col justify-center items-center px-8 cursor-pointer hover:bg-blue-700 transition-colors"
+                onClick={() => setShowFooterStats(false)}
+              >
+                <p className="text-[10px] font-medium uppercase opacity-90 mb-0.5 flex items-center gap-1">
+                  Total Général <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </p>
+                <p className="text-lg font-bold">{formatCurrency(grandTotal)}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -786,15 +862,17 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
             </div>
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 mt-auto">
-              <Button variant="outline" onClick={() => setIsEmailModalOpen(false)}>Annuler</Button>
+              <Button variant="outline" onClick={() => setIsEmailModalOpen(false)} disabled={isSending}>Annuler</Button>
               <Button 
                 className="bg-blue-600 hover:bg-blue-700 text-white" 
-                onClick={() => {
-                  alert("Devis expédié avec succès ! (Simulation)");
-                  setIsEmailModalOpen(false);
-                }}
+                onClick={handleSendEmail}
+                disabled={isSending}
               >
-                <Send size={16} className="mr-2" /> Envoyer le devis
+                {isSending ? (
+                  <>Patientez...</>
+                ) : (
+                  <><Send size={16} className="mr-2" /> Envoyer le devis</>
+                )}
               </Button>
             </div>
           </div>
@@ -881,13 +959,39 @@ export default function QuoteDetailClient({ quote }: { quote: any }) {
               <h2 className="text-lg font-bold text-gray-900">Éditer le client</h2>
               <button onClick={() => setIsEditClientModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-medium">✕</button>
             </div>
-            <div className="p-6 space-y-4">
-              <label className="text-sm font-semibold text-gray-700">Nom du client</label>
-              <Input 
-                value={clientNameInput}
-                onChange={(e) => setClientNameInput(e.target.value)}
-                placeholder="Ex: Romary Cosmétiques"
-              />
+            <div className="p-6 space-y-3">
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">Nom du client</label>
+                <Input 
+                  value={clientNameInput}
+                  onChange={(e) => setClientNameInput(e.target.value)}
+                  placeholder="Ex: Romary Cosmétiques"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">Entreprise</label>
+                <Input 
+                  value={clientCompanyInput}
+                  onChange={(e) => setClientCompanyInput(e.target.value)}
+                  placeholder="Ex: Dept of Veterans Affairs"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">Adresse principale</label>
+                <Input 
+                  value={clientAddressInput}
+                  onChange={(e) => setClientAddressInput(e.target.value)}
+                  placeholder="Ex: 1255 Wilford Hall Loop..."
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">Adresse de livraison</label>
+                <Input 
+                  value={clientShippingAddressInput}
+                  onChange={(e) => setClientShippingAddressInput(e.target.value)}
+                  placeholder="Ex: 98493, 9600 Veterans Dr..."
+                />
+              </div>
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 mt-auto">
               <Button type="button" variant="outline" onClick={() => setIsEditClientModalOpen(false)}>Annuler</Button>

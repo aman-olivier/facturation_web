@@ -97,8 +97,14 @@ export async function getQuoteById(quoteNumber: string) {
   // Fetch all articles for the combobox
   const { data: articles } = await supabase.from('articles').select('*')
 
+  // Fetch client details from clients table
+  const { data: clientInfo } = await supabase.from('clients').select('*').eq('name', quote.client_name).single()
+
   return {
     ...quote,
+    client_address: clientInfo?.address || quote.client_address,
+    client_shipping_address: clientInfo?.shipping_address || quote.client_shipping_address,
+    client_company: clientInfo?.company || quote.client_company,
     company,
     all_articles: articles || [],
     issue_date: quote.issue_date ? new Date(quote.issue_date).toLocaleDateString('fr-FR') : "—",
@@ -141,12 +147,46 @@ export async function deleteQuoteContact(id: string) {
   revalidatePath('/quotes')
 }
 
-export async function updateQuoteInfo(id: string, updates: { client_name?: string, notes?: string, shipping_cost?: number, discount?: number, tax_rate?: number }) {
+export async function updateQuoteInfo(id: string, updates: { client_name?: string, notes?: string, shipping_cost?: number, discount?: number, tax_rate?: number, client_company?: string, client_address?: string, client_shipping_address?: string }) {
   const supabase = await createClient()
+  
+  const { client_name, client_address, client_company, client_shipping_address, ...quoteUpdates } = updates;
+  
+  if (client_name) {
+    (quoteUpdates as any).client_name = client_name;
+  }
+  
+  // Update the quote table
   await supabase.from('quotes').update({
-    ...updates,
+    ...quoteUpdates,
     updated_at: new Date().toISOString()
   }).eq('id', id)
+
+  // Update or create the client in the `clients` table
+  if (client_name) {
+    const { data: existingClient } = await supabase.from('clients').select('id').eq('name', client_name).single();
+    
+    const clientData = {
+      name: client_name,
+      address: client_address,
+      company: client_company,
+      shipping_address: client_shipping_address
+    };
+
+    if (existingClient) {
+      const { error } = await supabase.from('clients').update(clientData).eq('id', existingClient.id);
+      if (error) {
+         // fallback if extra columns don't exist
+         await supabase.from('clients').update({ name: client_name, address: client_address }).eq('id', existingClient.id);
+      }
+    } else {
+      const { error } = await supabase.from('clients').insert([clientData]);
+      if (error) {
+         await supabase.from('clients').insert([{ name: client_name, address: client_address }]);
+      }
+    }
+  }
+
   revalidatePath('/quotes/[id]', 'page')
 }
 
