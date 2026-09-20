@@ -35,7 +35,7 @@ export function Sidebar() {
 
         <nav className="grid gap-1 px-4">
           <Link
-            href="/"
+            href="/dashboard"
             className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium bg-blue-50 text-blue-700"
           >
             <LayoutDashboard size={18} />

@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/Input"
 import { Label } from "@/components/ui/Label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/Card"
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { message: string }
+  searchParams: Promise<{ message: string }>
 }) {
+  const resolvedSearchParams = await searchParams;
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl border-none">
@@ -26,7 +27,7 @@ export default function LoginPage({
         </CardHeader>
         
         <CardContent className="px-8 pb-8">
-          <form className="space-y-6 flex flex-col">
+          <form className="space-y-6 flex flex-col" autoComplete="off">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-gray-900 font-medium">Adresse Email</Label>
@@ -37,6 +38,7 @@ export default function LoginPage({
                   required 
                   placeholder="vous@entreprise.com"
                   className="h-11 focus-visible:ring-blue-600"
+                  autoComplete="off"
                 />
               </div>
               <div className="space-y-2">
@@ -49,13 +51,14 @@ export default function LoginPage({
                   type="password" 
                   required 
                   className="h-11 focus-visible:ring-blue-600"
+                  autoComplete="new-password"
                 />
               </div>
             </div>
 
-            {searchParams?.message && (
+            {resolvedSearchParams?.message && (
               <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-100">
-                {searchParams.message}
+                {resolvedSearchParams.message}
               </div>
             )}
 
@@ -66,6 +69,11 @@ export default function LoginPage({
               <Link href="/signup" className="w-full">
                 <Button type="button" variant="outline" className="h-11 border-gray-200 hover:bg-gray-50 text-gray-700 font-medium w-full">
                   Créer un compte
+                </Button>
+              </Link>
+              <Link href="/" className="w-full">
+                <Button type="button" variant="ghost" className="h-11 text-gray-500 hover:text-gray-900 font-medium w-full">
+                  ← Retour à l'accueil
                 </Button>
               </Link>
             </div>

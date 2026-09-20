@@ -18,8 +18,8 @@ export async function login(formData: FormData) {
     redirect(`/login?message=Erreur de connexion: ${error.message}`)
   }
 
-  revalidatePath('/', 'layout')
-  redirect('/')
+  revalidatePath('/dashboard', 'layout')
+  redirect('/dashboard')
 }
 
 export async function signup(formData: FormData) {
@@ -36,10 +36,10 @@ export async function signup(formData: FormData) {
     redirect(`/login?message=Erreur de création: ${error.message}`)
   }
 
-  revalidatePath('/', 'layout')
+  revalidatePath('/dashboard', 'layout')
   
   if (authData?.session) {
-    redirect('/')
+    redirect('/dashboard')
   } else {
     redirect('/login?message=Compte créé avec succès ! Vous pouvez maintenant vous connecter.')
   }

@@ -26,7 +26,7 @@ export default function SignupPage({
         </CardHeader>
         
         <CardContent className="px-8 pb-8">
-          <form className="space-y-6 flex flex-col">
+          <form className="space-y-6 flex flex-col" autoComplete="off">
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -38,6 +38,7 @@ export default function SignupPage({
                     required 
                     placeholder="Jean Dupont"
                     className="h-11 focus-visible:ring-blue-600"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-2">
@@ -49,6 +50,7 @@ export default function SignupPage({
                     required 
                     placeholder="Mon Entreprise"
                     className="h-11 focus-visible:ring-blue-600"
+                    autoComplete="off"
                   />
                 </div>
               </div>
@@ -62,6 +64,7 @@ export default function SignupPage({
                   required 
                   placeholder="vous@entreprise.com"
                   className="h-11 focus-visible:ring-blue-600"
+                  autoComplete="off"
                 />
               </div>
 
@@ -74,6 +77,7 @@ export default function SignupPage({
                     type="password" 
                     required 
                     className="h-11 focus-visible:ring-blue-600"
+                    autoComplete="new-password"
                   />
                 </div>
                 <div className="space-y-2">
@@ -84,6 +88,7 @@ export default function SignupPage({
                     type="password" 
                     required 
                     className="h-11 focus-visible:ring-blue-600"
+                    autoComplete="new-password"
                   />
                 </div>
               </div>
